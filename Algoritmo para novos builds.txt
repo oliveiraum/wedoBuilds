@@ -1,0 +1,13 @@
+into build.xml file
+
+IF BUILD = RELEASE
+infra.ignore.versions=false
+ELSE
+READ build.properties file to see the new variable use.build.properties
+IF use.build.properties variable does not exist into build.properties file	OR if use.build.properties variable= false
+infra.ignore.versions=true
+ELSE 
+infra.ignore.versions=false
+END IF
+END IF
+LATER - at svn_auto-infra2-build file we should remove the information about infra.ignore.versions
