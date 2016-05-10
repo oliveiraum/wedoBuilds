@@ -1,0 +1,51 @@
+#!/usr/bin/sh
+
+cd "d:/programs/tools/build-tool"
+
+PRODUCT=$1
+BASELINE=$2
+BASELINE_TYPE=$3
+LOG_FILE=$4 
+BUILDER=$5  
+TEMPLATE=$6
+CM_TOOL=$7
+USE_ALTERNATE_LOCATIONS=$8
+USE_SONAR=$9
+SVN_BRANCH="${10}"
+##SVN_BRANCH="trunk"
+USE_SVNTAG="${11}"
+SVN_REVISION="${12}"
+REPOS_DIR="${13}"
+
+JAVA_HOME=C:/programs/java/jdk17_64_u75
+
+echo " ---- Command Line Supplied By Build Process ----" > $LOG_FILE 
+echo $0 $@ >> $LOG_FILE  
+echo " ---- End Command Line                       ----" >> $LOG_FILE  
+
+JAVA_OPTS="-Dinfra.ignore.versions=false"
+
+if [ "$TEMPLATE" = "BUILD_TEMPLATE" ]; then
+	JAVA_OPTS="-Dinfra.ignore.versions=true"
+fi
+
+if [ "$PRODUCT" = "raidsvn" ] || [ "$PRODUCT" = "AFSVN" ]; then
+	JAVA_OPTS="-Dinfra.ignore.versions=false"
+fi
+
+if [ "$USE_SONAR" = "Y" ]; then
+	USE_SONAR="true"
+else 
+	USE_SONAR="false"
+fi
+
+JAVA_OPTS="$JAVA_OPTS -Dcmtool=${CM_TOOL} -Dexternal.build=${USE_ALTERNATE_LOCATIONS} -Duse.sonar=${USE_SONAR} "
+
+echo "Set of options being received - $JAVA_OPTS" >> $LOG_FILE
+
+${JAVA_HOME}/bin/java -Xmx512M -Xms256M -jar ant-launcher.jar $JAVA_OPTS  -Dbuilder=$BUILDER -Dproduct=$PRODUCT -Dbaseline=$BASELINE -Drelease.type=$BASELINE_TYPE -Duser.language=en -Dsvn.branch="$SVN_BRANCH"  -Dsvn.revision="$SVN_REVISION" -Duse.svntag="$USE_SVNTAG" -Drepos.dir="$REPOS_DIR" >> $LOG_FILE 2>&1 
+RETURN_CODE=$?
+
+echo "Return Code: $RETURN_CODE" >> $LOG_FILE
+
+exit $RETURN_CODE

@@ -1,0 +1,689 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="yes" ?>
+<project name="INFRA_BUILDER" default="build">
+
+    <description>Main Makefile</description>
+
+    <!-- Tasks Definition -->
+    <taskdef resource="net/sf/antcontrib/antlib.xml" classpath="ant-contrib-1.0b3.jar" />
+    <taskdef resource="net/uworks/andariel/andariel.properties" classpath="andariel-1.2.3.jar" />
+
+    <taskdef name="versionstore" classname="wedo.ant.tasks.VersionStorage"/>
+
+
+    <property name="db.driver" value="oracle.jdbc.OracleDriver" />
+    <property name="db.host" value="wdsbld02" />
+    <property name="db.port" value="1521" />
+    <property name="db.sid" value="build01" />
+
+    <!-- Sonar SERVER HOST -->
+    <!--property name="sonar.host.url" value="http://buildsystem.wedo.pt:9000" />
+	<property name="sonar.jdbc.url" value="jdbc:oracle:thin:@${db.host}:${db.port}:${db.sid}" /-->
+    <property name="sonar.jdbc.driverClassName" value="${db.driver}" />
+    <property name="sonar.jdbc.username" value="sonar" />
+    <property name="sonar.jdbc.password" value="sonar" />
+
+    <property name="sonar.host.url" value="http://wdsapp01:9000/" />
+    <property name="sonar.jdbc.url" value="jdbc:oracle:thin:@wdsbld02:1521:build01" />
+    <!--property name="sonar.host.url" value="http://wdsts01:9000/" /-->
+    <!--property name="sonar.jdbc.url" value="jdbc:oracle:thin:@wdstst01:1521:tst11r2" /-->
+
+
+
+    <property name="java.home.1.5" location="c:/programs/java/jdk15_32" />
+    <property name="java.home.1.6" location="c:/programs/java/jdk16_64" />
+    <property name="java.home.1.7" location="c:/programs/java/jdk17_64_u75" />
+    <property name="java.home.1.8" location="C:/programs/java/jdk18_64_u31" />
+
+
+    <property name="java.memory.opts.1.6" value="-Xmx1500M -Xms512M" />
+    <property name="java.memory.opts.1.5" value="-Xmx1500M -Xms512M" />
+    <property name="java.memory.opts.1.7" value="-Xmx2048M -Xms512M -XX:MaxPermSize=256m " />
+    <property name="java.memory.opts.1.8" value="-Xmx2048M -Xms512M " />
+
+    <property name="db.url" value="jdbc:oracle:thin:@${db.host}:${db.port}:${db.sid}" />
+    <property name="db.usr" value="BUILDADM" />
+    <property name="db.pwd" value="wedo123" />
+
+
+    <property name="webdriver.chrome.driver" value="D:/programs/tools/build-tool/chrome-driver/chromedriver.exe" />
+
+    <property name="dim.ext.conn" value ="-host wdsdim01 -dbname wdsoft@dimb" />
+    <property name="dim.ext.usr" value ="buildint" />
+    <property name="dim.ext.pwd" value ="Wedo2010_" />
+
+    <property name="dim.conn" value ="-host wdsdim01 -dbname pcms@dimb" />
+    <property name="dim.usr" value ="build" />
+    <property name="dim.pwd" value ="Wedo2010_" />
+
+
+    <propertyregex property="component.name" input="${baseline}" regexp="(.*)_R.*" select="\1" />
+    <propertyregex property="version" input="${baseline}" regexp=".*_R(.*)" select="\1" />
+    <propertyregex property="version.major" input="${version}" regexp="(\d+)\.\d+\.\d+\.\d+" select="\1" />
+    <propertyregex property="version.minor" input="${version}" regexp="\d+\.(\d+)\.\d+\.\d+" select="\1" />
+    <propertyregex property="version.revision" input="${version}" regexp="\d+\.\d+\.(\d+)\.\d+" select="\1" />
+    <propertyregex property="version.build" input="${version}" regexp="\d+\.\d+\.\d+\.(\d+)" select="\1" />
+
+
+
+
+    <echo message="CM TOOL:  ${cmtool}" />	
+    <echo message="Baseline:  ${baseline}" />	
+    <echo message="Version:  ${version}" />	
+    <echo message="Version Major:  ${version.major}" />	
+    <echo message="Version Minor:  ${version.minor}" />	
+    <echo message="Version revision:  ${version.revision}" />	
+    <echo message="Version build:  ${version.build}" />	
+
+
+
+
+    <!-- SVN  -->
+    <property name="svn.path" value="c:/Program Files/TortoiseSVN/bin" />
+    <property name="svn.repository" value="http://wdsjira01:82/repos/${component.name}" />
+    <property name="svn.usr" value="techadm" />
+    <property name="svn.pwd" value="techadmcm" />
+
+    <propertyregex property="tag4dig" input="${version.build}" regexp="(\d+)\d{2}" select="\1" />
+    <property name="svn.tag" value="${version.major}.${version.minor}.${version.revision}.${tag4dig}" />
+
+    <!-- SVNWDSOFT  External Repository -->
+    <property name="svn.ext.repository" value="http://wdsjira01:82/reposwdsoft/${component.name}" />
+    <!-- build name for wdsoft builds will not include the last 2 digits, because it will not be different builds by the same tag  -->
+    <property name="svn.ext.tag" value="${version.major}.${version.minor}.${version.revision}.${version.build}" />
+
+
+
+    <property name="backup.dir"               location="h:/infra2_repository/backup" />
+
+    <!-- Product Related Repository -->
+    <property name="repository.dev.dir"       location="h:/infra2_repository/dev" />
+    <property name="repository.rel.dir"       location="h:/infra2_repository/release" />
+
+
+    <property name="repository.build.dir"     location="g:/" />
+
+    <!-- External Repository -->
+    <property name="repository.ext.dev.dir"   location="h:/external_repository/dev" />
+    <property name="repository.ext.rel.dir"   location="h:/external_repository/release" />	
+    <property name="repository.ext.build.dir" location="h:/external_repository/build" />
+
+
+    <target name="init-props">
+
+        <if>
+
+            <equals arg1="${external.build}" arg2="Y" casesensitive="true" />
+            <then>
+                <property name="output.dir" location="${repository.ext.build.dir}/${product}/${component.name}_${version.major}.${version.minor}/${baseline}" />
+                <if>
+                    <equals arg1="${release.type}" arg2="WD_REL_BL_LC" casesensitive="false" />
+                    <then>
+                        <!-- Release Type -->
+                        <property name="debug" value="false" />
+                        <property name="repository.dir" location="${repository.ext.rel.dir}" />
+                        <property name="repository.pathlist" value="${repository.rel.dir}/components/{0}/{2}{3}/, ${repository.rel.dir}/components/RAID_EC/{2}{3}/, ${repository.rel.dir}/components/WEDOPORTAL/{2}{3}/, ${repository.rel.dir}/components/BV/{2}{3}/, ${backup.dir}/components/{0}/{2}{3}/, ${backup.dir}/components/RAID_EC/{2}{3}/" />
+                        <property name="release.type.restriction" value="AND TYPE = &apos;${release.type}&apos;" />
+                    </then>
+                    <else>
+                        <!-- Dev Type -->
+                        <property name="debug" value="true" />
+                        <property name="repository.dir" location="${repository.ext.dev.dir}" />
+
+                        <if>
+                            <equals arg1="${repos.dir}" arg2="ALL" casesensitive="false" />
+                            <then>
+                                <echo message="Look max build for each component at dev and release directories" />	
+                                <property name="repository.pathlist" value="${repository.dev.dir}/components/{0}/{2}{3}/, ${repository.dev.dir}/components/WEDOPORTAL/{2}{3}/, ${repository.dev.dir}/components/BV/{2}{3}/, ${repository.dev.dir}/components/RAID_EC/{2}{3}/, ${repository.rel.dir}/components/{0}/{2}{3}/, ${repository.rel.dir}/components/WEDOPORTAL/{2}{3}/, ${repository.rel.dir}/components/BV/{2}{3}/, ${repository.rel.dir}/components/RAID_EC/{2}{3}/, ${backup.dir}/components/{0}/{2}{3}/, ${backup.dir}/components/RAID_EC/{2}{3}/" />
+                                <property name="release.type.restriction" value="" />
+                            </then>
+                            <else>
+                                <echo message="Look max build for each component just at DEV directory" />	
+                                <property name="repository.pathlist" value="${repository.dev.dir}/components/{0}/{2}{3}/, ${repository.dev.dir}/components/WEDOPORTAL/{2}{3}/, ${repository.dev.dir}/components/BV/{2}{3}/, ${repository.dev.dir}/components/RAID_EC/{2}{3}/, ${backup.dir}/components/{0}/{2}{3}/, ${backup.dir}/components/RAID_EC/{2}{3}/" />
+                                <property name="release.type.restriction" value="AND TYPE = &apos;${release.type}&apos;" />
+                            </else>
+                        </if>
+                    </else>
+                </if>
+            </then>
+            <else>
+
+                <property name="output.dir" location="${repository.build.dir}/${product}/${component.name}_${version.major}.${version.minor}/${baseline}" />
+                <if>
+                    <equals arg1="${release.type}" arg2="WD_REL_BL_LC" casesensitive="false" />
+                    <then>
+                        <!-- Release Type -->
+                        <property name="debug" value="false" />
+                        <property name="repository.dir" location="${repository.rel.dir}" />
+                        <property name="repository.pathlist" value="${repository.rel.dir}/components/{0}/{2}{3}/, ${repository.rel.dir}/components/WEDOPORTAL/{2}{3}/, ${repository.rel.dir}/components/BV/{2}{3}/, ${repository.rel.dir}/components/RAID_EC/{2}{3}/, ${backup.dir}/components/{0}/{2}{3}/, ${backup.dir}/components/RAID_EC/{2}{3}/" />
+                        <property name="release.type.restriction" value="AND TYPE = &apos;${release.type}&apos;" />
+
+                    </then>
+                    <else>
+                        <!-- Dev Type -->
+                        <property name="debug" value="true" />
+                        <property name="repository.dir" location="${repository.dev.dir}" />
+
+                        <!-- Repos Dir = ALL - look at dev and rel dir -->
+                        <if>
+                            <equals arg1="${repos.dir}" arg2="ALL" casesensitive="false" />
+                            <then>
+                                <echo message="Look max build for each component at dev and release directories" />	
+                                <property name="repository.pathlist" value="${repository.dev.dir}/components/{0}/{2}{3}/, ${repository.dev.dir}/components/WEDOPORTAL/{2}{3}/, ${repository.dev.dir}/components/BV/{2}{3}/, ${repository.dev.dir}/components/RAID_EC/{2}{3}/, ${repository.rel.dir}/components/{0}/{2}{3}/, ${repository.rel.dir}/components/WEDOPORTAL/{2}{3}/, ${repository.rel.dir}/components/BV/{2}{3}/, ${repository.rel.dir}/components/RAID_EC/{2}{3}/, ${backup.dir}/components/{0}/{2}{3}/, ${backup.dir}/components/RAID_EC/{2}{3}/" />
+                                <property name="release.type.restriction" value="" />
+                            </then>
+                            <else>
+                                <echo message="Look max build for each component just at DEV directory" />	
+                                <property name="repository.pathlist" value="${repository.dev.dir}/components/{0}/{2}{3}/, ${repository.dev.dir}/components/WEDOPORTAL/{2}{3}/, ${repository.dev.dir}/components/BV/{2}{3}/, ${repository.dev.dir}/components/RAID_EC/{2}{3}/, ${backup.dir}/components/{0}/{2}{3}/, ${backup.dir}/components/RAID_EC/{2}{3}/" />
+                                <property name="release.type.restriction" value="AND TYPE = &apos;${release.type}&apos;" />
+                            </else>
+                        </if>
+                    </else>
+                </if>
+            </else>
+        </if>
+        <property name="distribution.dir" location="${repository.dir}/distribution/${component.name}/${baseline}" />
+        <property name="repository.alljars.dir" location="${repository.dir}/development/${component.name}/${version.major}.${version.minor}" />
+        <property name="component.dir" location="${repository.dir}/components/${component.name}/${version.major}${version.minor}" />
+        <property name="debug.dir" location="${repository.dir}/debug/${component.name}/${baseline}" />
+
+        <echo message="Using the following repository path list: ${repository.pathlist}" />
+    </target>
+
+    <target name="init" depends="init-props">		
+
+        <delete dir="${output.dir}" />
+        <mkdir dir="${output.dir}" />
+    </target>
+
+
+    <target name="get-src" depends="init">
+        <if>
+            <equals arg1="${cmtool}" arg2="WDSOFT" casesensitive="false" />
+            <then>				
+                <exec executable="dmcli.exe" failonerror="true" searchpath="true" dir="${output.dir}">
+                    <arg line=" -user ${dim.ext.usr} -pass ${dim.ext.pwd} ${dim.ext.conn} -cmd &quot;DOWNLOAD /BASELINE=&quot;&quot;&quot;${product}:${baseline}&quot;&quot;&quot; /USER_DIRECTORY=&quot;&quot;&quot;${output.dir}&quot;&quot;&quot; /NOMETADATA&quot;" />
+                </exec>
+            </then>
+            <else>
+                <if>
+                    <equals arg1="${cmtool}" arg2="SVNWDSOFT" casesensitive="false" />
+                    <then>			
+                        <!-- This part will get from SVN, repos wdsoft (from tag)  -->	
+                        <echo message="Get sources from tag:${svn.ext.tag}" />	
+                        <exec executable="${svn.path}/svn" failonerror="true" dir="${output.dir}">
+                            <arg line=" co ${svn.ext.repository}/tags/${svn.ext.tag} ${output.dir} --username ${svn.usr} --password ${svn.pwd} " />
+                        </exec>
+
+                    </then>	   
+                    <else>
+                        <!-- This part will get from SVN (from branch or from tag)  -->
+
+                        <if>
+                            <equals arg1="${use.svntag}" arg2="N" casesensitive="false" />
+                            <then>		
+                                <echo message="Get sources from SVN Branch:${svn.branch} Revision: ${svn.revision}" />					
+                                <exec executable="${svn.path}/svn" failonerror="true" dir="${output.dir}">
+                                    <arg line=" co ${svn.repository}/${svn.branch}/ -r ${svn.revision} ${output.dir} --username ${svn.usr} --password ${svn.pwd} " />
+                                </exec>
+                            </then>	   
+                            <else>
+                                <echo message="Get sources from tag:${svn.tag}" />	
+                                <exec executable="${svn.path}/svn" failonerror="true" dir="${output.dir}">
+                                    <arg line=" co ${svn.repository}/tags/${svn.tag} ${output.dir} --username ${svn.usr} --password ${svn.pwd} " />
+                                </exec>
+                            </else>
+                        </if>
+                    </else>
+                </if>
+            </else>
+        </if>
+        <fail message="Files not retrieved from Dimensions...">
+            <condition>
+                <resourcecount count="0">
+                    <fileset dir="${output.dir}">
+                        <include name="**" />
+                    </fileset>
+                </resourcecount>
+            </condition>
+        </fail>
+
+    </target>
+
+
+    <target name="build-info" depends="get-src">
+        <!-- Retrieve Java version -->
+        <xpath file="${output.dir}/config/dependencies.xml"
+                    expression="//java-spec/@version"
+                    outputproperty="java.version" />
+
+        <echo message="Using Java version ${java.version}" />
+
+        <propertycopy name="java.location" from="java.home.${java.version}" />
+        <propertycopy name="java.memory.opts" from="java.memory.opts.${java.version}" />
+
+        <!-- Retrieve INFRA version -->
+        <if>
+            <contains string="${builder}" substring="STANDARD" casesensitive="false" />
+            <then>
+                <property file="${output.dir}/build.properties" prefix="buildtmp" />
+
+                <if>
+                    <and>
+                        <isset property="buildtmp.infra.version" />
+                        <isfalse value="${infra.ignore.versions}"/>
+                    </and>
+                    <then>
+                        <echo>Using infra version ${buildtmp.infra.version}</echo>
+                        <propertyregex property="infra.version.major" input="${buildtmp.infra.version}" regexp="(\d+)\.\d+\.\d+\.\d+" select="\1" />
+                        <propertyregex property="infra.version.minor" input="${buildtmp.infra.version}" regexp="\d+\.(\d+)\.\d+\.\d+" select="\1" />
+                        <propertyregex property="infra.version.revision" input="${buildtmp.infra.version}" regexp="\d+\.\d+\.(\d+)\.\d+" select="\1" />
+                        <propertyregex property="infra.version.build" input="${buildtmp.infra.version}" regexp="\d+\.\d+\.\d+\.(\d+)" select="\1" />
+
+
+                        <property name="baseline.restriction" value="major=${infra.version.major} AND minor=${infra.version.minor} AND revision=${infra.version.revision} AND build=${infra.version.build}"/>
+                    </then>
+                    <else>
+                        <echo>Automatic choosing a new INFRA versions ...</echo>						
+                        <xpath file="${output.dir}/config/dependencies.xml"
+                            expression="//infra-version/@major"
+                            outputproperty="infra.version.major" />
+                        <xpath file="${output.dir}/config/dependencies.xml"
+                            expression="//infra-version/@minor"
+                            outputproperty="infra.version.minor" />
+
+
+
+
+
+
+
+                        <property name="baseline.restriction" value="major=${infra.version.major} AND minor=${infra.version.minor}" />
+                    </else>
+                </if>
+
+
+                <echo>
+                    <![CDATA[
+					SELECT 'infra.version=' || REPLACE(BL_ID,'INFRA_R') || CHR(13) || CHR(10) || 'infra.release.type=' || TYPE
+					FROM
+					  (SELECT * FROM (SELECT BL_ID, TYPE,
+						REGEXP_REPLACE(BL_ID,'^(.+)_R(\d+)\.(\d+)\.(\d+)\.(\d+)$','\1') component,
+						to_number(REGEXP_REPLACE(BL_ID,'^(.+)_R(\d+)\.(\d+)\.(\d+)\.(\d+)$','\2')) major,
+						to_number(REGEXP_REPLACE(BL_ID,'^(.+)_R(\d+)\.(\d+)\.(\d+)\.(\d+)$','\3')) minor,
+						to_number(REGEXP_REPLACE(BL_ID,'^(.+)_R(\d+)\.(\d+)\.(\d+)\.(\d+)$','\4')) revision,
+						to_number(REGEXP_REPLACE(BL_ID,'^(.+)_R(\d+)\.(\d+)\.(\d+)\.(\d+)$','\5')) build
+					  FROM bld_created
+					  WHERE return_code = 0 
+					  AND REGEXP_LIKE(BL_ID, '^.+_R\d+\.\d+\.\d+\.\d+$')
+					  ORDER BY major DESC,
+						minor DESC,
+						revision DESC,
+						build DESC)
+					  WHERE COMPONENT = 'INFRA'
+					  AND ${baseline.restriction}
+					  ${release.type.restriction} )
+					WHERE rownum < 2;
+					]]>
+                </echo>
+                <tempfile property="temp.file" createfile="true" deleteonexit="true" destDir="."/>
+                <echo>Using temp file -> ${temp.file}</echo>
+                <sql driver="${db.driver}" url="${db.url}" userid="${db.usr}" password="${db.pwd}"
+					 expandProperties="true" showheaders="false" showtrailers="false" print="yes"
+					 output="${temp.file}" append="false">
+                    <![CDATA[
+					SELECT 'infra.version=' || REPLACE(BL_ID,'INFRA_R') || CHR(13) || CHR(10) || 'infra.release.type=' || TYPE
+					FROM
+					  (SELECT * FROM (SELECT BL_ID, TYPE,
+						REGEXP_REPLACE(BL_ID,'^(.+)_R(\d+)\.(\d+)\.(\d+)\.(\d+)$','\1') component,
+						to_number(REGEXP_REPLACE(BL_ID,'^(.+)_R(\d+)\.(\d+)\.(\d+)\.(\d+)$','\2')) major,
+						to_number(REGEXP_REPLACE(BL_ID,'^(.+)_R(\d+)\.(\d+)\.(\d+)\.(\d+)$','\3')) minor,
+						to_number(REGEXP_REPLACE(BL_ID,'^(.+)_R(\d+)\.(\d+)\.(\d+)\.(\d+)$','\4')) revision,
+						to_number(REGEXP_REPLACE(BL_ID,'^(.+)_R(\d+)\.(\d+)\.(\d+)\.(\d+)$','\5')) build
+					  FROM bld_created
+					  WHERE return_code = 0 
+					  AND REGEXP_LIKE(BL_ID, '^.+_R\d+\.\d+\.\d+\.\d+$')
+					  ORDER BY major DESC,
+						minor DESC,
+						revision DESC,
+						build DESC)
+					  WHERE COMPONENT = 'INFRA'
+					  AND ${baseline.restriction}
+					  ${release.type.restriction} )
+					WHERE rownum < 2;
+					]]>
+                </sql>
+
+                <property file="${temp.file}" prefix="build" />
+                <delete file="${temp.file}" />
+
+                <!-- Check if the infra version exists (if it was returned by the query)-->
+
+                <echo message="Using INFRA version ${build.infra.version} of type ${build.infra.release.type}" />
+
+                <if>
+                    <equals arg1="${build.infra.release.type}" arg2="WD_REL_BL_LC" casesensitive="false" />
+                    <then>
+                        <!-- Release Type -->
+                        <available filepath="${repository.rel.dir}/distribution/infra/infra_r${build.infra.version}"
+							file="infra-build_${build.infra.version}.jar" type="file"
+							property="infra.build.jar" value="${repository.rel.dir}/distribution/infra/infra_r${build.infra.version}/infra-build_${build.infra.version}.jar" />
+                    </then>
+                    <else>
+                        <!-- Dev Type -->
+                        <available filepath="${repository.dev.dir}/distribution/infra/infra_r${build.infra.version}"
+							file="infra-build_${build.infra.version}.jar" type="file"
+							property="infra.build.jar" value="${repository.dev.dir}/distribution/infra/infra_r${build.infra.version}/infra-build_${build.infra.version}.jar" />
+                    </else>
+                </if>
+
+                <property name="infra.build.jar" location="${backup.dir}/distribution/infra/infra_r${build.infra.version}/infra-build_${build.infra.version}.jar"/>
+            </then>
+        </if>
+    </target>
+
+
+    <!--Build target -->
+    <target name="build" depends="get-src, build-info">
+        <if>
+            <contains string="${builder}" substring="INFRA" casesensitive="false" />
+            <then>
+                <echo>Compiling INFRA version ${version}</echo>
+                <!-- Infra build classpath -->
+                <path id="build.classpath">
+                    <fileset dir="${output.dir}/java/jars/" includes="**/*.jar"/>
+                </path>
+                <exec executable="${java.location}/bin/java.exe" failonerror="true" dir="${output.dir}">
+                    <arg line="  -jar java/jars/ant-launcher.jar -Duser.language=en -Dversion=${version} -lib ${toString:build.classpath} " />
+                </exec>
+                <copy todir="${distribution.dir}">
+                    <fileset dir="${output.dir}\dist" includes="*build*.jar" />
+                </copy>
+                <copy todir="${component.dir}">
+                    <fileset dir="${output.dir}\dist" includes="*server*.jar" />
+                </copy>
+                <copy todir="${debug.dir}">
+                    <fileset dir="${output.dir}\build\libs" />
+                </copy>
+
+                <echo>*** Publishing XSD files  ***</echo>
+                <if>
+                    <available file="repository.alljars.dir" type="dir" />
+                    <then>						
+                        <delete>
+                            <fileset dir="${repository.alljars.dir}" includes="**/*"/>
+                        </delete>
+                    </then>
+                    <else>					
+                        <mkdir dir="${repository.alljars.dir}"/>
+                    </else>
+                </if>
+                <copy todir="${repository.alljars.dir}" failonerror="false">
+                    <fileset dir="${output.dir}/xml/schemas" includes="**/*.xsd" />
+                </copy>
+            </then>
+            <else>
+                <if>
+                    <contains string="${builder}" substring="ANT" casesensitive="false" />
+                    <then>
+                        <echo>Using builder -> ${builder}</echo>						
+                        <exec executable="${java.location}/bin/java.exe" failonerror="true" dir="${output.dir}">
+                            <arg line="${java.memory.opts} -Duser.language=en -jar build/ant/ant-launcher.jar -Dversion=${version} -Drepository.base.path=${repository.rel.dir} -Djava.build.debug=${debug} -Drepository.pathlist=&quot;${repository.pathlist}&quot; " />
+                        </exec>
+                    </then>					
+                    <else>					
+                        <echo>Uncompressing INFRA ...</echo>
+                        <unjar src="${infra.build.jar}" dest="${output.dir}" overwrite="true" />
+                        <echo>Compiling ${product} -&gt; baseline ${baseline} ...</echo>
+                        <exec executable="${java.location}/bin/java.exe" failonerror="true" timeout="72000000" dir="${output.dir}" newenvironment="true">
+                            <arg line="${java.memory.opts} -Duser.language=en -Dinfra.ignore.versions=${infra.ignore.versions} -jar build/infra/lib/ant-launcher.jar -Dversion=${version} -Djava.build.debug=${debug} -verbose -Dwebdriver.chrome.driver=${webdriver.chrome.driver} -Drepository.pathlist=&quot;${repository.pathlist}&quot;" />
+                        </exec>
+
+                    </else>
+                </if>
+                <if> 
+                    <and>
+                        <contains string="${builder}" substring="STANDARD" casesensitive="false" />
+                        <contains string="${use.sonar}" substring="TRUE" casesensitive="false" />
+                    </and>
+                    <then>	
+                        <echo>Dumping metricts to SONAR</echo>
+                        <!--antcall target="sonar" inheritAll="true" inheritRefs="true" /-->
+                        <exec executable="${java.location}/bin/java.exe" failonerror="false" timeout="3600000" dir=".">
+                            <arg line="${java.memory.opts} -Duser.language=en -Dinfra.ignore.versions=${infra.ignore.versions} -Drelease.type=${release.type} -Dbuilder=${builder} -Dexternal.build=${external.build} -Dbaseline=${baseline} -Dproduct=${product} -Dversion=${version} -jar ant-launcher.jar  sonar" />
+                        </exec>
+                    </then>
+                </if>
+                <!-- <parallel threadCount="4" failonany="false"> -->
+                <echo>*** Copying files to respository  ***</echo>
+
+                <if>
+                    <available file="${output.dir}\dist\products" type="dir" />
+                    <then>
+                        <echo>*** Copying distribution jars  ***</echo>
+                        <mkdir dir="${distribution.dir}"/>
+                        <copy todir="${distribution.dir}">
+                            <fileset dir="${output.dir}\dist\products" />
+                        </copy>
+                    </then>
+                </if>
+
+                <if>
+                    <available file="${output.dir}\dist\components" type="dir" />
+                    <then>
+                        <echo>*** Copying components jars  ***</echo>
+                        <mkdir dir="${component.dir}"/>
+                        <copy todir="${component.dir}">
+                            <fileset dir="${output.dir}\dist\components" />
+                        </copy>
+                    </then>
+                </if>
+                <if>
+                    <available file="${output.dir}\dist\addons" type="dir" />
+                    <then>
+                        <echo>*** Copying addon distribution jars  ***</echo>
+                        <mkdir dir="${distribution.dir}\addons"/>
+                        <copy todir="${distribution.dir}\addons">
+                            <fileset dir="${output.dir}\dist\addons" />
+                        </copy>
+                    </then>
+                </if>
+                <if>
+                    <available file="${output.dir}\dist\debug" type="dir" />
+                    <then>
+                        <echo>*** Copying debug jars  ***</echo>
+                        <mkdir dir="${debug.dir}"/>
+                        <copy todir="${debug.dir}">
+                            <fileset dir="${output.dir}\dist\debug" />
+                        </copy>
+                    </then>
+                </if>
+                <if>
+                    <available file="${output.dir}/build/.versions" type="file" />
+                    <then>
+                        <echo>*** Storing version dependencies on database  ***</echo>
+                        <versionstore url="${db.url}" user="${db.usr}" pwd="${db.pwd}" baseline="${baseline}"  fileVersionsPath="${output.dir}/build/.versions" />                        
+                    </then>
+                </if>								
+                <!-- </parallel> -->
+
+                <echo>*** Dumping all release jars  ***</echo>
+                <if>
+                    <available file="${repository.alljars.dir}" type="dir" />
+                    <then>						
+                        <delete>
+                            <fileset dir="${repository.alljars.dir}" includes="**/*"/>
+                        </delete>
+                    </then>
+                    <else>					
+                        <mkdir dir="${repository.alljars.dir}"/>
+                    </else>
+                </if>
+
+                <copy todir="${repository.alljars.dir}" flatten="true"  failonerror="false">
+                    <fileset dir="${output.dir}" includes="**/*.jar" excludes="dist/products/*.jar,dist/components/*.jar,**/build.jar,**/boot.jar,backup/*.jar" />
+                </copy>
+
+                <copy todir="${repository.alljars.dir}" failonerror="false">
+                    <fileset dir="${output.dir}/build/reports" includes="**/*.xml" />
+                </copy>
+
+                <echo>*** Copying documents  ***</echo>
+                <mkdir dir="${repository.alljars.dir}/docs"/>
+                <copy todir="${repository.alljars.dir}/docs" failonerror="false">
+                    <fileset dir="${output.dir}/doc/user" includes="**/*" />
+                </copy>
+
+                <echo>*** Copying JUNIT Reports  ***</echo>
+                <mkdir dir="${repository.alljars.dir}/junit"/>
+                <copy todir="${repository.alljars.dir}/junit" failonerror="false">
+                    <fileset dir="${output.dir}/doc/user" includes="**/*" />
+                </copy>
+            </else>
+        </if>
+        <!--echo>Killing any outstanding processes from chromedriver</echo>
+	<exec executable="taskkill.exe" failonerror="false" dir=".">
+		<arg line="/F /IM chromedriver.exe /T" />
+	</exec-->
+    </target>
+
+
+
+    <!-- Integration with Sonar -->
+    <target name="init-sonar" depends="init-props" >
+        <!-- This will only work for INFRA based products -->	
+
+        <taskdef uri="antlib:org.sonar.ant" resource="org/sonar/ant/antlib.xml"/>
+        <path id="classpath.libs">
+            <fileset dir="${output.dir}/" includes="**/*.jar"/>			
+        </path>
+    </target>
+
+    <target name="preprocess-jscover" depends="init-props">
+        <echo>Preprocessing Reports</echo>
+
+        <if>
+            <available file="${output.dir}/test_reports" type="dir" />
+            <then>
+                <path id="jscover.reports">
+                    <dirset dir="${output.dir}/test_reports">
+                        <include name="*"/>
+                    </dirset>
+                </path>
+
+                <pathconvert property="jscover.reports.list" pathsep=" " refid="jscover.reports"/>		
+
+                <if>
+                    <not>
+                        <equals arg1="${jscover.reports.list}" arg2="" />
+                    </not>
+                    <then>	
+                        <echo message="Merging the following reports together: ${jscover.reports.list}"/>
+
+                        <java classname="jscover.report.Main" fork="true">
+                            <classpath>
+                                <pathelement location="JSCover-all.jar"/>
+                                <pathelement path="${java.class.path}"/>
+                            </classpath>
+                            <arg value="--merge"/>
+                            <arg line="${jscover.reports.list}"/>
+                            <arg value="${output.dir}/test_reports/TOTAL"/>
+                        </java>
+
+
+                        <echo message="Converting the report to LCOV format."/>
+                        <java classname="jscover.report.Main" fork="true">
+                            <classpath>
+                                <pathelement location="JSCover-all.jar"/>
+                                <pathelement path="${java.class.path}"/>
+                            </classpath>
+
+                            <arg value="--format=LCOV"/>
+                            <arg value="${output.dir}/test_reports/TOTAL"/>
+                            <arg value="${output.dir}/web" />
+                        </java>
+
+                        <pathconvert property="output.dir.jscover.aux" dirsep="/">					
+                            <path location="${output.dir}"/>
+                        </pathconvert>
+                        <script language="javascript">
+                            <![CDATA[
+							var dir = project.getProperty('output.dir.jscover.aux');
+							project.setProperty('output.dir.jscover', dir.replace('g:', 'G:'));
+						]]>
+                        </script>					
+                        <echo message="Removing the file location: ${output.dir.jscover}"/>
+                        <replace file="${output.dir}/test_reports/TOTAL/jscover.lcov" token="SF:${output.dir.jscover}/" value="SF:"/>
+                        <replace file="${output.dir}/test_reports/TOTAL/jscover.lcov" token="SF:web/lib" value="SF:web/sdk/lib"/>
+                    </then>
+                </if>
+            </then>
+        </if>
+
+    </target>
+
+    <target name="sonar" depends="init-sonar,preprocess-jscover" >
+
+        <echo>*** Integrating ${component.name}_R${version.major}.${version.minor} with Sonar ***</echo>
+        <echo>*** Using ${sonar.jdbc.url} ***</echo>
+        <echo>*** Using ${sonar.jdbc.driverClassName} ***</echo>
+
+        <mkdir dir="${output.dir}/java/jsp" />
+        <mkdir dir="${output.dir}/java/src" />
+        <mkdir dir="${output.dir}/java/test"/>
+        <mkdir dir="${output.dir}/web" />
+
+        <!-- Java version -->
+        <xpath file="${output.dir}/config/dependencies.xml"
+                    expression="//java-spec/@version"
+                    outputproperty="java.version.sonar" />
+
+        <echo>*** Using java.version.sonar: ${java.version.sonar} ***</echo>
+        <property name="sonar.java.source" value="${java.version.sonar}"/>
+        <property name="sonar.java.target" value="${java.version.sonar}"/>
+
+        <!-- list of mandatories Sonar properties -->
+        <property name="sonar.sources" value="${output.dir}/java/src,${output.dir}/web,${output.dir}/java/jsp" />
+
+        <!-- list of optional Sonar properties -->
+        <!-- The name defined in Ant root node" /-->
+        <property name="sonar.projectName" value="${component.name}_R${version.major}.${version.minor}"/>
+
+
+
+        <!-- List of directories which contain for example the Java bytecode" -->
+        <property name="sonar.java.binaries" value="${output.dir}/build/java/debug_classes" />
+
+        <!-- List of paths to libraries separated by a comma (These libraries are for example used by the Sonar Findbugs plugin)" -->
+        <pathconvert property="sonar.java.libraries" refid="classpath.libs" pathsep="," />
+
+        <!-- Associate one quality profile to the project -->
+        <if>  
+            <isset property="sonar.profile.name"/>
+            <then>	
+                <property name="sonar.profile" value="${sonar.profile.name}"/>
+            </then>
+        </if>
+
+        <!-- Import Junit Tests Report -->
+        <property name="sonar.dynamicAnalysis" value="reuseReports"/>
+        <property name="sonar.junit.reportsPath" value="${output.dir}/build/reports/tests"/>
+        <property name="sonar.projectKey" value="${sonar.projectName}"/>
+        <property name="sonar.projectVersion" value="${version}"/>
+        <property name="sonar.login" value="admin" />
+        <!--property name="sonar.password" value="admin" /-->
+        <property name="sonar.password" value="Sonar4Admin" />
+
+        <!-- Code Coverage -->
+
+        <property name="sonar.java.coveragePlugin" value="jacoco"/>
+        <property name="sonar.jacoco.reportPath" value="${output.dir}/build/reports/jacoco/jacoco.exec"/>
+        <property name="sonar.tests" value="${output.dir}/java/test" />
+        <property name="sonar.javascript.lcov.reportPath" value="${output.dir}/test_reports/TOTAL/jscover.lcov" />
+
+        <property name="sonar.projectBaseDir" value="${output.dir}" />
+        <!-- Invoke the sonar -->
+        <sonar:sonar xmlns:sonar="antlib:org.sonar.ant" />
+        <echo>*** Integration of ${sonar.projectName} with Sonar ended ***</echo>
+    </target>
+
+</project>

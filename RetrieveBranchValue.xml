@@ -1,0 +1,36 @@
+        <!-- Retrieve if variable branch isset in build.properties -->
+        <if>
+            <contains string="${use_branch}" substring="Y" casesensitive="false" />
+            <then>
+                <property file="${output.dir}/build.properties" prefix="buildtmp" />
+
+                <if>
+                    <and>
+                        <isset property="buildtmp.infra.version" />
+                        <isfalse value="${infra.ignore.versions}"/>
+                    </and>
+                    <then>
+                        <echo>Using infra version ${buildtmp.infra.version}</echo>
+                        <propertyregex property="infra.version.major" input="${buildtmp.infra.version}" regexp="(\d+)\.\d+\.\d+\.\d+" select="\1" />
+                        <propertyregex property="infra.version.minor" input="${buildtmp.infra.version}" regexp="\d+\.(\d+)\.\d+\.\d+" select="\1" />
+                        <propertyregex property="infra.version.revision" input="${buildtmp.infra.version}" regexp="\d+\.\d+\.(\d+)\.\d+" select="\1" />
+                        <propertyregex property="infra.version.build" input="${buildtmp.infra.version}" regexp="\d+\.\d+\.\d+\.(\d+)" select="\1" />
+                        
+
+                        <property name="baseline.restriction" value="major=${infra.version.major} AND minor=${infra.version.minor} AND revision=${infra.version.revision} AND build=${infra.version.build}"/>
+                    </then>
+                    <else>
+                    <echo>Automatic choosing a new INFRA versions ...</echo>						
+                        <xpath file="${output.dir}/config/dependencies.xml"
+                            expression="//infra-version/@major"
+                            outputproperty="infra.version.major" />
+                        <xpath file="${output.dir}/config/dependencies.xml"
+                            expression="//infra-version/@minor"
+                            outputproperty="infra.version.minor" />
+                     <!--** Added property path to dependencies file > -->
+                        <xpath file="${output.dir}/config/dependencies.xml"
+                            expression="//infra-version/@path"
+                            outputproperty="infra.version.path" />
+                        <property name="baseline.restriction" value="major=${infra.version.major} AND minor=${infra.version.minor} AND value="path=${infra.version.path}" />
+                    </else>
+                </if>

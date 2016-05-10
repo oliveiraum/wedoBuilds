@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<d:dependencies
+              schema-version="1.0"
+              xmlns:d="urn:wedo:infra:dependencies-2.0">
+
+    <java-spec version="1.7" />
+ 
+    <infra-version major="2" minor="3" revision="0" build="0" />
+
+    <components>
+        <component name="infra" server="true" client="false">
+            <compatible major="2" minor="3" revision="0" build="0" branch = ""/>
+        </component>
+		   <component name="afsvn" server="true" client="false">
+            <compatible major="3" minor="1" revision="0" build="0" branch = ""/>
+        </component>
+    </components>
+ 
+</d:dependencies>
